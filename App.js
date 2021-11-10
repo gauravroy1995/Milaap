@@ -6,7 +6,7 @@
  * @flow strict-local
  */
 
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import type {Node} from 'react';
 import {
   SafeAreaView,
@@ -18,6 +18,9 @@ import {
   View,
   FlatList,
   Dimensions,
+  Image,
+  TouchableOpacity,
+  ToastAndroid
 } from 'react-native';
 
 import {
@@ -27,6 +30,9 @@ import {
   LearnMoreLinks,
   ReloadInstructions,
 } from 'react-native/Libraries/NewAppScreen';
+import Modal from 'react-native-modal';
+import {EntryForm} from './src/assets/views/EntryForm';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Section = ({children, title}): Node => {
   const isDarkMode = useColorScheme() === 'dark';
@@ -84,7 +90,56 @@ const App: () => Node = () => {
     {name: 'RTest20', number: 9999999970},
   ];
 
-  const [userContacts, setUserContacts] = useState(initialState);
+  const [userContacts, setUserContacts] = useState([]);
+
+  const [isModalVisible, setModal] = useState(false);
+
+  const KEY = 'ARRAY_DATA';
+
+  //didmount
+  useEffect(() => {
+    saveToAsyncInitial()
+  }, []);
+
+  const saveToAsyncInitial = async () => {
+    const ifExist = await checkIfAsyncExists();
+    if (ifExist) {
+      const value = await AsyncStorage.getItem(KEY);
+      const jsonarr = JSON.parse(value);
+      setUserContacts(jsonarr)
+      return null;
+    }
+
+    setUserContacts(initialState)
+    const stringi = await JSON.stringify(initialState);
+    await AsyncStorage.setItem(KEY, stringi);
+  };
+
+  const saveToDB = async(arrayData) => {
+    const stringi = await JSON.stringify(arrayData);
+    await AsyncStorage.setItem(KEY, stringi);
+  }
+
+  const checkIfAsyncExists = async () => {
+    try  {
+      const value = await AsyncStorage.getItem(KEY);
+      if (value) {
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const deleteItem = (item) => {
+    const newArray = userContacts.filter((data) => data.name != item.name);
+    
+    setUserContacts(newArray);
+    saveToDB(newArray)
+    
+  }
 
   const renderEach = ({item, index}) => {
     const firstInitial = item?.name[0] ?? 'Z';
@@ -103,6 +158,15 @@ const App: () => Node = () => {
             <Text>{number}</Text>
           </View>
         </View>
+        <TouchableOpacity style={styles.youchable}
+        onPress={() => deleteItem(item)}
+        >
+          <Image
+            height={20}
+            width={20}
+            source={require('./src/assets/trash.png')}
+          />
+        </TouchableOpacity>
       </View>
     );
   };
@@ -110,8 +174,72 @@ const App: () => Node = () => {
   const renderHeader = () => {
     return (
       <View style={styles.headerS}>
-        <Text>Team members</Text>
+        <Image
+        source={require('./src/assets/group.png')}
+          height={20}
+          width={20}
+          resizeMode="contain"
+        />
+        <Text style={styles.newTra}>Team members</Text>
       </View>
+    );
+  };
+
+  const onBurPress = () => {
+    setModal(true);
+  };
+
+  const onSavePress = (text,number) => {
+    setModal(false)
+    if(!text || !number){
+      ToastAndroid.show("Enter valid input", ToastAndroid.LONG);
+      return null
+    }
+
+    const checkIfTextOrNumber = userContacts.some((data) =>{
+      if(data.name === text){
+        return true
+      }
+      if(data.number === number){
+        return true
+      }
+    });
+
+    if(checkIfTextOrNumber){
+      ToastAndroid.show("Entry already exists", ToastAndroid.LONG);
+      return null
+    }
+
+    const newObj = {
+      name:text,
+      number:number
+    }
+
+    ToastAndroid.show("Data saved!", ToastAndroid.SHORT);
+
+    const newArrya = [...userContacts,newObj];
+    setUserContacts(newArrya);
+    saveToDB(newArrya)
+
+
+  }
+  const renderButton = () => {
+    return (
+      <TouchableOpacity style={styles.buttonWra} onPress={onBurPress}>
+        <Text style={styles.adiR}>Add Members</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderModal = () => {
+    return (
+      <Modal isVisible={isModalVisible}
+      onBackdropPress={() => setModal(false)}
+      >
+        <EntryForm 
+        onSave={onSavePress}
+        />
+      </Modal>
     );
   };
 
@@ -125,6 +253,8 @@ const App: () => Node = () => {
         horizontal={false}
         initialNumToRender={5}
       />
+      {renderButton()}
+      {renderModal()}
     </View>
   );
 };
@@ -161,10 +291,12 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     padding: 15,
     height: (Dimensions.get('window').height - 100) / 5,
-justifyContent:'center'
+    justifyContent: 'space-between',
+    flexDirection: 'row',
   },
   leftWrap: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   roundIni: {
     backgroundColor: 'rgba(107, 5, 12,0.4)',
@@ -179,14 +311,40 @@ justifyContent:'center'
     fontWeight: '500',
     marginTop: 30,
     marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   textST: {
     fontSize: 16,
     fontWeight: '800',
   },
+
   rightSw: {
     marginLeft: 10,
     justifyContent: 'space-between',
+  },
+  newTra: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 10,
+  },
+  youchable: {
+    justifyContent: 'center',
+  },
+  buttonWra: {
+    position: 'absolute',
+    bottom: 30,
+    zIndex: 4,
+    alignItems: 'center',
+    backgroundColor: 'rgba(107, 5, 12,1)',
+    alignSelf: 'center',
+    borderRadius: 20,
+  },
+  adiR: {
+    fontSize: 14,
+    color: '#fff',
+    paddingHorizontal: 30,
+    paddingVertical: 10,
   },
 });
 
